@@ -1,0 +1,785 @@
+---
+title: "Exemples des précédents TDs"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+
+# TD 4 : Intervalle de confiance pour un paramètre
+
+## 4.1 Protéines
+
+
+On a mesuré le taux de protéines (en \%) de 10 échantillons de blé tendre. On suppose que le taux de protéines du blé suit une distribution normale de moyenne $\mu$ et d’écart-type $\sigma$ et que les différents échantillons sont **indépendants**. On obtient les valeurs suivantes :
+
+```{r}
+prot = c(11.34, 10.78, 13.67, 13.10, 12.15, 10.35, 12.37, 12.91, 12.82, 10.51)
+```
+
+1) Donner une estimation du taux moyen de protéines et de son écart-type.
+
+L'estimateur de la moyenne est 
+$$\bar X = \frac{1}{n} \sum_{i=1}^n X_i.$$
+
+```{r}
+# Moyenne empirique
+moyenne = mean(prot)
+moyenne
+```
+
+
+L'estimateur de la variance (à moyenne inconnue) est
+$$S^2 = \frac{1}{n-1} \sum_{i=1}^n (X_i - \bar X)^2.$$
+```{r}
+# Ecart-type empirique
+ecarttype = sd(prot)
+ecarttype
+```
+
+On peut vérifier que l'estimation fournie par la fonction `sd` correspond bien à la version sans biais (division par $n-1$) :
+
+```{r}
+sqrt(1/(length(prot)-1)*sum((prot-moyenne)^2))
+```
+
+2) Déterminer l’intervalle de confiance de la moyenne $\mu$ avec un niveau de confiance 95\% :
+
+a) en supposant que $\sigma$ est connu, avec $\sigma = 1.18$,
+
+On rappelle l'intervalle de confiance de la moyenne pour un niveau $1 - \alpha$ **à variance connue** :
+$$ IC_{1 - \alpha}(\mu) = \left[ \bar x - \frac{\sigma}{\sqrt n} u_{1-\alpha/2} ; \bar x + \frac{\sigma}{\sqrt n} u_{1-\alpha/2} \right],$$
+où $u_{1-\alpha/2}$ est le quantile de niveau $1 - \alpha/2$ de la loi normale centrée réduite $\mathcal N (0, 1)$.
+
+```{r}
+n = length(prot)
+alpha = 0.05
+sigma = 1.18
+quantile = qnorm(1 - alpha/2)
+int_conf = c(moyenne - sigma / sqrt(n) * quantile, moyenne + sigma / sqrt(n) * quantile)
+int_conf
+```
+
+b) lorsque $\sigma$ est inconnu.
+
+On rappelle l'intervalle de confiance de la moyenne pour un niveau $1 - \alpha$ **à variance inconnue** :
+$$ IC_{1 - \alpha}(\mu) = \left[ \bar x - \frac{s}{\sqrt n} t_{n-1; 1-\alpha/2} ; \bar x + \frac{s}{\sqrt n} t_{n-1; 1-\alpha/2} \right],$$
+où $t_{n-1; 1-\alpha/2}$ est le quantile de niveau $1 - \alpha/2$ de la loi de Student à $n-1$ degrés de liberté $\mathcal T_{n-1}$.
+
+```{r}
+n = length(prot)
+alpha = 0.05
+quantile = qt(1 - alpha/2, df=n-1)
+int_conf = c(moyenne - ecarttype / sqrt(n) * quantile, moyenne + ecarttype / sqrt(n) * quantile)
+int_conf
+```
+
+
+3) Déterminer l’intervalle de confiance de la variance $\sigma^2$ avec un niveau de confiance 95\% :
+
+a) en supposant que $\mu$ est connue avec $\mu = 12$,
+
+On rappelle l'estimateur de la variance à $\mu$ connue :
+$$\widehat\sigma^2 = \frac{1}{n} \sum_{i=1}^n (X_i - \mu)^2,$$
+et la loi associée :
+$$\frac{n \widehat\sigma^2}{\sigma^2} \sim \chi_n^2.$$
+
+L'intervalle de confiance de la variance pour un niveau $1 - \alpha$ **à espérance connue** est donc :
+$$IC_{1 - \alpha}(\sigma^2) = \left[ \frac{n \widehat\sigma^2}{\chi_{n; 1 - \alpha/2}^2} ; \frac{n \widehat\sigma^2}{\chi_{n; \alpha/2}^2} \right],$$
+où $\chi_{n; a}$ désigne le quantile de niveau $a$ de la loi du Chi-2 à $n$ degrés de liberté $\chi_n^2$.
+
+```{r}
+n = length(prot)
+alpha = 0.05
+mu = 12
+sigmahat2 = mean((prot-mu)^2)
+quantile1 = qchisq(alpha/2, df=n)
+quantile2 = qchisq(1 - alpha/2, df=n)
+int_conf = c(n*sigmahat2/quantile2, n*sigmahat2/quantile1)
+int_conf
+```
+
+b) lorsque $\mu$ est inconnue.
+
+On rappelle la loi associée à $S^2$ :
+$$\frac{(n-1)S^2}{\sigma^2} ~ \chi_{n-1}^2.$$
+
+L'intervalle de confiance de la variance pour un niveau $1 - \alpha$ **à espérance inconnue** est donc :
+$$IC_{1 - \alpha}(\sigma^2) = \left[ \frac{(n-1) S^2}{\chi_{n-1; 1 - \alpha/2}^2} ; \frac{(n-1) S^2}{\chi_{n-1; \alpha/2}^2} \right].$$
+
+```{r}
+n = length(prot)
+alpha = 0.05
+s2 = var(prot)
+quantile1 = qchisq(alpha/2, df=n-1)
+quantile2 = qchisq(1 - alpha/2, df=n-1)
+int_conf = c((n-1)*s2/quantile2, (n-1)*s2/quantile1)
+int_conf
+```
+
+
+## 4.2 Tomates
+
+Pour contrôler la taille d’une production de tomates, on relève un échantillon de taille $n$ dans la production
+totale et on calcule l’intervalle de confiance de la proportion de tomates dont la taille est inférieure à un
+seuil $\delta$. On cherche à comparer plusieurs méthodes de calcul, pour différentes valeurs des proportions.
+
+Soit $X$ la variable aléatoire représentant le nombre de tomates dont la taille est inférieure au seuil $\delta$
+parmi les $n$ tomates constituant l’échantillon.
+On considère que chaque tomate prélevée est **indépendante** des autres et possède **la même probabilité** $p$ que sa taille soit inférieure au seuil $\delta$.
+On a alors :
+$$X \sim B(n, p),$$
+avec $n$ connu et $p$ inconnu.
+
+On se donne $n = 100$ et $x = 20$.
+L'estimateur de $p$ est donné par $\widehat p = \frac{X}{n}$ et sa réalisation est $\widehat p^{obs} = \frac{x}{n} = 0.2$.
+
+1) Donner un intervalle de confiance au niveau $1 − \alpha$ de $p$.
+
+On décide d'approcher la loi de $X$ par une loi normale bien choisie.
+On vérifie d'abord que les conditions de l'approximation sont valides : $n\widehat p = 20 > 10$ et $n(1 - \widehat p) = 80 > 10$.
+On a alors :
+$$X \overset{approx.} \sim \mathcal N\big(np, np(1-p)\big).$$
+
+En utilisant l'approximation $\sqrt{p(1-p)} \approx \sqrt{\widehat p(1 - \widehat p)}$, on obtient l'intervalle de confiance suivant pour $p$ (cf. votre cours) :
+$$IC_{1-\alpha}(p) = \left[ \widehat p - u_{1-\alpha/2} \sqrt{\frac{\widehat p (1 - \widehat p)}{n}}; \widehat p + u_{1-\alpha/2} \sqrt{\frac{\widehat p (1 - \widehat p)}{n}} \right].$$
+
+```{r}
+n = 100
+alpha = 0.05
+phat = 0.2
+quantile = qnorm(1 - alpha/2)
+int_conf = c(phat - quantile * sqrt(phat*(1-phat)/n), phat + quantile * sqrt(phat*(1-phat)/n))
+int_conf
+```
+
+
+# TD 5 : Tests d'hypothèses (moyenne)
+
+## 5.1 Hauteur de ficus
+
+Un ficus doit atteindre la hauteur de 40 cm au bout d'un an. Un pépiniériste  qui cherche à controler la taille de ses ficus dans une serre  en mesure 10.
+Il obtient les résultats suivants :
+
+```{r}
+ficus = c( 38 , 34,43  ,40,  30 , 32 , 44,  41 , 36 , 36 )
+```
+
+On suppose que la taille $X$ d'un ficus d'un an suit une loi normale de moyenne $\mu$ et de variance $\sigma^2$.   
+
+1) Donner une estimation de la moyenne et la variance de la taille des ficus.
+
+```{r}
+# Moyenne empirique 
+moyenne = mean(ficus)
+moyenne
+variance = var(ficus)
+variance
+```
+
+2) Construire un test pour répondre à la question "la hauteur des ficus est-elle de 40cm ?"
+
+  - Les hypothèses de test sont :
+    * $H_0 : \{ \mu = \mu_0 = 40cm \}$,
+    * $H_1 : \{ \mu \ne \mu_0\}$.
+  - On se donne un risque de 1ère espèce $\alpha = 5\%$.
+  - La statistique de test sous $H_0$ est :
+$$T = \sqrt n \frac{\bar X - \mu_0}{S} \overset{H_0} \sim \mathcal T_{n-1}.$$
+  - La zone de rejet est **bilatérale** et donnée par :
+$$R = \big\{ | T | > t_{n-1; 1-\alpha/2} \big\} .$$
+  - On effectue l'application numérique et on conclut :
+
+
+```{r}
+n = length(ficus)
+mu0 = 40
+alpha = 0.05
+stat = sqrt(n) * (moyenne - mu0) / sqrt(variance)
+stat
+quantile = qt(1 - alpha/2, df=n-1)
+quantile
+```
+
+On a $|t| < t_{n-1; 1-\alpha/2}$, donc on ne rejette pas $H_0$ au risque $\alpha = 5\%$ : la hauteur des ficus n'est pas significativement différente de 40 cm.
+
+
+La p-value du test est donnée par :
+\begin{align*}
+p_\mathrm{{value}} &= 2\,\mathrm{Pr} (T > |t|) \\
+&= 2\,(1 - \mathrm{Pr} (T < |t|)).
+\end{align*}
+
+```{r}
+pvalue = 2*(1 - pt(abs(stat), df=n-1))
+pvalue
+```
+
+
+On a $p_\mathrm{value} > \alpha$ : cela est bien conforme avec la décision de ne pas rejeter $H_0$ au risque $\alpha$.
+
+Ce test de comparaison de moyenne à une valeur de référence peut également être effectué avec la fonction suivante :
+```{r}
+t.test(ficus,mu=mu0,alternative="two.sided")
+```
+
+
+## 5.2 Paquets de beurre
+Sur une chaine de remplissage de paquets de beurre de 250g, on controle tous les jours la contenance en prélevant 12 paquets au hasard. Lorsque il y a un dérèglement la contenance est supérieure à 250g. On suppose que la contenance d'un paquet pris au hasard suit une loi normale de moyenne et de variance inconnue $\mathcal{N}(\mu, \sigma^2)$.\\
+On rappelle qu'une variable $X$ qui suit loi géométrique de paramètre $p$ a pour loi de probabilité $P(X=k)=(1-p)^{k-1}p$ et que $E(X) = \dfrac{1}{p}$.
+
+1) Écrire les hypothèses, la statistique et la zone de rejet d'un test pour vérifier s'il n'y pas dérèglement. En déduire une valeur seuil $\tau$ pour la moyenne des 12 paquets au dessus de laquelle on pourra affirmer avec un risque inférieur à $\alpha$ que la machine remplit trop les paquets.
+
+  - Les hypothèses de test sont :
+    * $H_0 : \{ \mu = \mu_0 = 250g \}$,
+    * $H_1 : \{ \mu > \mu_0\}$.
+  - On se donne un risque de 1ère espèce $\alpha$.
+  - La statistique de test sous $H_0$ est :
+$$T = \sqrt n \frac{\bar X - \mu_0}{S} \overset{H_0} \sim \mathcal T_{n-1}.$$
+  - La zone de rejet est **unilatérale** et donnée par :
+$$R = \big\{  T  > t_{n-1; 1-\alpha} \big\} .$$
+  - La valeur seuil est $\tau = \mu_0+t_{n-1; 1-\alpha}\frac{s}{\sqrt{n}}$
+
+2) Un jour donné la moyenne empirique des 12 paquets est égale à $251.5$g, l'écart type empirique est égal à $5$g. Peut-on en conclure que la chaine est déréglée pour un risque $\alpha=0.05$ ? Calculer la probabilité critique associée à ces observations.
+
+
+```{r}
+mu0 = 250
+s = 5
+alpha = 0.05
+n = 12
+quantile = qt(1 - alpha, df=n-1)
+seuil = mu0 + quantile*s/sqrt(n)
+seuil
+stat = (251.5-mu0)/(s/sqrt(n))
+stat
+pvalue = 1 - pt(stat, df=n-1)
+pvalue
+```
+
+La moyenne observée n'est pas dans la région de rejet, la p-valeur est supérieure à 0.05, on ne rejette pas $H_0$ et le poids moyen des paquets de beurre n'est pas significativement supérieur à 250g.
+
+
+3) Soit $N$ la variable aléatoire qui représente le nombre de jours écoulés avant de détecter une valeur moyenne sur les 12 paquets supérieure au seuil alors que la machine n'est pas déréglée. Donner la loi de $N$ en fonction de $\alpha$. Quelle doit être la valeur de $\alpha$ pour que en moyenne on ait une fausse alerte par trimestre (91 jours) ?
+
+
+$N$ est une variable aléatoire qui suit une loi géométrique de paramètre $p=$ Proba(détecter une panne alors que la machine n'est pas déréglée) $= \alpha$.
+$E(N)=\frac{1}{\alpha} = 91$, $\alpha = \frac{1}{91}$
+
+```{r}
+alpha = 1/91
+alpha 
+```
+
+
+4) On suppose maintenant que la variance de la loi de la contenance des paquets est connue égale à $25$g$^2$. 
+  - Recalculer le seuil de la question 1.   
+$\tau_{nouv}=\mu_0 + u_{1-\alpha}\frac{\sigma}{\sqrt{n}}$  
+  - On suppose également que lorsque la chaine est déréglée la moyenne de la contenance des bouteilles est $\mu_1=253$g. Calculer $\beta$ la probabilité  de ne pas détecter le dérèglement alors que la chaine est déréglée.    
+$\beta = P(\overline{X} < \tau_{nouv} | \mu = \mu_1) = P(\frac{\overline{X} - \mu_1}{\sigma/\sqrt{n}} < \frac{\mu_0 + u_{1-\alpha}\frac{\sigma}{\sqrt{n}} - \mu_1}{\sigma/\sqrt{n}} = P(U < \frac{\mu_0 - \mu_1}{\sigma/\sqrt{n}} + u_{1-\alpha})$ où est une variable aléatoire normale centrée réduite.    
+  
+5) Soit $J$ la variable aléatoire qui représente le nombre de jours écoulés avant de détecter le dérèglement lorsque la chaine est déréglée. Donner la loi de $J$ et calculer sa moyenne. Interpréter.   
+$J$ suit une loi géométrique de paramètre $p=$ Proba(détecter le dérèglement alors que la chaine est déréglée) $= 1-\beta$. $E(J)= \frac{1}{1-\beta }$.
+
+```{r}
+mu1 = 253
+alpha = 0.05
+variance = 25
+quantile = qnorm(1 - alpha)
+nouveau_seuil = mu0 + quantile * sqrt(variance/n)
+nouveau_seuil
+beta = pnorm((mu0-mu1)/sqrt(variance/n) + quantile)
+EJ = 1/(1-beta)
+# risque de seconde espèce
+beta
+# espérance du nombre de jours avant de détecter le déréglage
+EJ
+```
+
+
+# TD 6 : Tests d'hypothèses (proportion, variance)
+
+## 6.1 Pyrale
+Lors d'une étude épidémiologique régionale on cherche à estimer la part de parcelles de céréales affectées par une pyrale particulièrement nocive. Pour cela on relève dans $n=64$ parcelles la présence ou l'absence de la pyrale, la présence de la pyrale est observée dans 15 parcelles. Des mesures sont préconisées si la proportion de parcelles touchées est supérieure à 20\%.   
+
+1) Mettre en place un test au risque $\alpha$ pour décider si la proportion de parcelles touchées est significativement supérieure à 20\%. Expliciter l'hypothèse nulle $H_0$, l'hypothèse alternative $H_1$, donner la statistique de test utilisée, sa loi approchée sous $H_0$ et la règle de décision au niveau $\alpha$.
+Appliquer le test aux données ci-dessus. Est-il nécessaire de mettre en oeuvre les mesures si on choisit de prendre un risque de première espèce  $5\%$ ?
+
+On note $X$ le nombre de parcelles touchées. $X \sim B(n,p),$ où $n = 64$ et $p$ est inconnu. 
+L'estimateur du maximum de vraisemblance de la proportion $p$ est $\widehat p = \frac{X}{n}$ et sa réalisation est ici $\widehat p^{obs} = \frac{x}{n} = \frac{15}{64}.$
+
+  - Les hypothèses de test sont :
+    * $H_0 : \{ p = p_0 = 0.2 \}$,
+    * $H_1 : \{ p > p_0\}$.
+  - On se donne un risque de 1ère espèce $\alpha = 5\%$.
+  - La statistique de test sous $H_0$ est :
+$$X \overset{H_0} \sim B(n, p_0).$$
+  - La zone de rejet est **unilatérale** et donnée par :
+$$R = \big\{ X \ge B_{n; p_0; 1-\alpha} \big\},$$
+où $B_{n; p_0; 1-\alpha}$ désigne le quantile de niveau $1 - \alpha$ de la loi binomiale $B(n, p_0)$.
+  - (Optionnel) La p-value est donnée par 
+\begin{align*}
+p_\mathrm{value} &= \mathrm{Pr} (X \ge x)\\
+&= 1 - \mathrm{Pr} (X \le x-1).
+\end{align*}
+  - On effectue l'application numérique et on conclut :
+
+
+```{r}
+n = 64
+p0 = 0.2
+x = 15
+alpha = 0.05
+stat = x
+#statistique
+stat
+quantile = qbinom(1 - alpha, size=n, prob=p0)
+#quantile
+quantile
+pval = 1 - pbinom(x-1, size=n, prob=p0)
+#pvaleur
+pval
+```
+
+On a $x < B_{n; p_0; 1-\alpha}$, donc on ne rejette pas $H_0$ au risque $\alpha$. Il n'est pas nécessaire de prendre des mesures.
+
+Ce test de comparaison de proportion peut également être effectué avec la fonction :
+
+```{r}
+binom.test(x=x,n=n,p=p0,alternative = "greater")
+```
+
+En pratique, si l'on n'a pas accès à la fonction de répartition de la loi binomiale (ou à ses tables), il faut approcher la loi de $X$ par une loi normale. On vérifie les conditions de l'approximation sous $H_0$ :
+$$np_0 = 12.8 \ge 10, \qquad n(1-p_0) = 51.2 \ge 10.$$
+Ces conditions étant vérifiées, on approche la loi de $X$ sous $H_0$ par :
+$$X \overset{approx.} \sim \mathcal N\big(np_0, np_0(1-p_0)\big).$$
+Le test s'écrit alors :
+  - Les hypothèses de test sont :
+    * $H_0 : \{ p = p_0 = 0.2 \}$,
+    * $H_1 : \{ p > p_0\}$.
+  - On se donne un risque de 1ère espèce $\alpha = 5\%$.
+  - La statistique de test sous $H_0$ est :
+$$T = \frac{X - np_0}{\sqrt{np_0(1-p_0)}} \overset{H_0} \sim \mathcal N(0, 1).$$
+  - La zone de rejet est **unilatérale** et donnée par :
+$$R = \big\{ T > u_{1-\alpha} \big\}.$$
+  - (Optionnel) La p-value est donnée par 
+$$p_\mathrm{value} = \mathrm{Pr} (T > t).$$
+  - On effectue l'application numérique et on conclut :
+
+
+```{r}
+n = 64
+p0 = 0.2
+x = 15
+alpha = 0.05
+stat = (x - n*p0)/sqrt(n*p0*(1-p0))
+stat
+quantile = qnorm(1 - alpha)
+quantile
+pval = 1 - pnorm(stat)
+pval
+```
+
+On a $p_\mathrm{value} > \alpha$, donc on ne rejette $H_0$ pas au risque $\alpha$. 
+
+
+
+2) Calculer le risque de seconde espèce et la puissance du test sous l'hypothèse que la part de parcelles touchées est de 25\%.   
+Avec la loi exacte :  
+$\beta = P(X < B_{n; p_0; 1-\alpha} | p=p_1)$  
+$\eta = 1-\beta$  
+Avec l'approximation normale   
+$\beta_{approx} = P(\frac{X - np_0}{\sqrt{np_0(1-p_0)}} < u_{1-\alpha}|p=p_1) = P(X < np_0 +u_{1-\alpha}\sqrt{np_0(1-p_0)}|p=p_1) = P(\frac{X - np_1}{\sqrt{np_1(1-p_1)}} < \frac{ np_0 +u_{1-\alpha}\sqrt{np_0(1-p_0)} -np_1}{\sqrt{np_1(1-p_1)}})$
+$\eta_{approx} = 1 - \beta_{approx}$
+
+```{r}
+p1 = 0.25
+quantile = qbinom(1 - alpha, size=n, prob=p0)
+beta = pbinom(quantile,size=n, prob=p1)
+# erreur de 2nde espèce
+beta
+eta = 1 - beta
+# puissance du test
+eta
+quantile = qnorm(1 - alpha)
+beta_approx = pnorm((n*(p0-p1) + quantile*sqrt(n*p0*(1-p0)))/(sqrt(n*p1*(1-p1))))
+eta_approx = 1 - beta_approx
+# erreur de 2nde espèce approchée
+beta_approx
+# puissance du test
+eta_approx
+```
+
+3) Combien de parcelles faudrait-il relever pour avoir un risque de première espèce et un risque de seconde espèce égaux à 5\%?  
+Il faut que 
+$$ \sqrt{n} = u_{1-\alpha} \frac{\sqrt{p_0(1-p_0)} +\sqrt{p_1(1-p_1)}}{p_1-p_0}$$
+
+```{r}
+racine_n = quantile* (sqrt(p0*(1-p0)) + sqrt(p1*(1-p1)))/(p1-p0)
+n = racine_n**2
+n
+```
+
+
+## 6.2 Mesure de dioxyde d'azote
+
+On soupçonne un capteur mesurant la concentration de dioxyde d'azote (NO$_2$)  d'être déréglé et de donner des mesures très variables. Pour le vérifier on relève les mesures faites pendant une période non polluée de $n=15$ jours  où la concentration en NO$_2$ reste constante et on calcule la variance de cet échantillon. Le constructeur garantit en fonctionnement normal que l'écart-type  de la variable aléatoire $X$, mesure de la concentration d'un jour pris au hasard, est égal à $\sigma_0 = 10 \mu$g/m$^3$.   
+1) On suppose que la mesure de la concentration un jour pris au hasard suit une loi normale. Construire le test sur la variance qui rejette l'hypothèse selon laquelle le capteur est bien réglé quand la variance est trop élevée, au risque $\alpha$. La variance empirique $s_{n}^2=\dfrac{1}{n-1}\sum_{i=1}^n (x_i-\overline{x})^2$ de l'échantillon est égale à 156.25. Peut-on affirmer  que le capteur est trop variable au risque $\alpha=0.05$ ? 
+
+Il convient de faire attention qu'il s'agit d'un test avec zone de rejet unilatérale.
+
+  - Les hypothèses de test sont :
+  
+     - $H_0 : \{ \sigma = \sigma_0 = 10\mu$g/m$^3 \}$,
+  
+     - $H_1 : \{ \sigma > \sigma_0 \}$.
+  
+  - On se donne un risque de 1ère espèce $\alpha = 5\%$.
+  - La statistique de test sous $H_0$ est :
+$$T = \frac{(n-1)\widehat\sigma^2}{\sigma^2} \overset{H_0} \sim \chi_{n-1}^2.$$
+  - La zone de rejet est **unilatérale** est donnée par :
+$$R = \big\{ T \ge \chi_{n; 1 - \alpha}^2 \big\}.$$
+  - (Optionnel) La p-value est donnée par 
+$$p_\mathrm{value} = \mathrm{Pr} (T \ge t).$$
+  - On effectue l'application numérique et on conclut :
+
+```{r}
+n = 15
+sigma0 = 10
+sigmahat2 = 156.25
+alpha = 0.05
+stat = n * sigmahat2 / (sigma0*sigma0)
+stat
+quantile = qchisq(1-alpha, df=n-1)
+quantile
+pval = 1 - pchisq(stat, df=n-1)
+pval
+```
+
+On a $t < \chi_{n-1; 1 - \alpha}^2$, donc on ne rejette $H_0$ pas au risque $\alpha = 10\%$. L'écart-type du capteur n' est pas significativement supérieur à 10\mu$g/m$^3.
+
+
+2) Calculer le risque de seconde espèce $\beta(\sigma_1)$ quand on a pour hypothèse alternative $V(X) = \sigma_1^2$ avec $\sigma_1 > \sigma_0$.
+En déduire la puissance du test lorsque  $\sigma_1= 12.5 \mu$g/m$^3$.  
+
+$\beta= P(\frac{(n-1)\widehat\sigma^2}{\sigma_0^2} < \chi_{n; 1 - \alpha}^2 |\sigma_1)  =  
+P(\frac{(n-1)\widehat\sigma^2}{\sigma_1^2} < \chi_{n; 1 - \alpha}^2 \frac{\sigma_0^2}{\sigma_1^2})$   
+$\eta = 1 - \beta$
+
+```{r}
+sigma1 = 12.5
+alpha = 0.05
+quantile = qchisq(1-alpha, df=n-1)
+beta = pchisq(quantile*sigma0**2/sigma1**2, df=n-1)
+eta = 1 -beta
+# risque de 2nde espèce
+beta
+# puissance
+eta
+```
+
+# TD 7 : Tests d'hypothèses (comparaison de moyennes)
+
+## 7.1 Agriculture de conservation et herbicide
+
+L'agriculture de conservation est un système de culture qui favorise une perturbation minimale du sol et renforce la biodiversité. Cependant ses différentes composantes peuvent avoir des effets antagonistes sur la gestion des adventices, en particulier de favoriser leur présence et de nécessiter l'application d'herbicide. On a pendant plusieurs années et sur plusieurs parcelles de champs de blé en zone humide, comparé l'effet de l'application d'herbicide sur la densité totale d'adventices.
+On note $X$ la densité d'adventices pour les $38$ parcelles traitées avec des herbicides, et $Y$ la densité d'adventices pour les $37$ parcelles non traitées. On a obtenu les résultats suivants :
+$$
+  \overline{x} = 100.68 \quad \overline{y}=193.59 \quad s^2_{x}=19877.37\quad s^2_{y}=34459.62
+$$
+
+Il s'agit d'échantillons non appariés : les $38$ parcelles traitées $X_i$ avec des herbicides, sont indépendantes des $37$ parcelles non traitées $Y_j$, c-à-d $X_i$ et $Y_j$ sont indépendantes, $\forall i,j$.
+
+On suppose que  $X_i \overset{i.i.d.} \sim \mathcal N(\mu_X, \sigma_X^2)$ et $Y_j \overset{i.i.d.} \sim \mathcal N(\mu_Y, \sigma_Y^2)$
+
+On a :
+$$\bar X \sim \mathcal N \left( \mu_X, \frac{\sigma_X^2}{n_X} \right), \qquad\qquad \bar Y \sim \mathcal N \left( \mu_Y, \frac{\sigma_Y^2}{n_Y} \right)$$
+
+
+1. Montrer que les variances des deux échantillons ne sont pas significativement différentes.   
+Les hypothèses de test sont :
+    * $H_0 : \{ \sigma_X^2 = \sigma_Y^2 \}$,
+    * $H_1 : \{ \sigma_X^2 \ne \sigma_Y^2 \}$.   
+    On se donne un risque de 1ère espèce $\alpha = 5\%$.   
+    La statistique de test sous $H_0$ est :   
+    $$F = \frac{S_X^2}{S_Y^2} \overset{H_0} \sim \mathcal F_{n_x - 1; n_y - 1},$$   
+    où $n_x, n_y$ désignent les effectifs des échantillons et $S_X^2, S_Y^2$ sont les estimateurs usuels de la variance de $X_i$ et $Y_j$ respectivement.   
+    La zone de rejet est **bilatérale** et donnée par :   
+$$R = \big\{ F \le f_{n_X-1; n_Y-1; \alpha/2} \big\} \cup \big\{ F \ge f_{n_X-1; n_Y-1; 1-\alpha/2} \big\},$$
+où $f_{n_X-1; n_Y-1; a}$ désigne le quantile de niveau $a$ de la loi de Fisher à $n_X - 1$ et $n_Y - 1$ degrés de liberté.   
+La p-value est donnée par 
+\begin{align*}
+p_\mathrm{value} &= 2\,\mathrm{Pr} (F \ge t) & \text{si}~t > 1,\\
+&= 2\,\mathrm{Pr} (F \le t) & \text{sinon}.
+\end{align*}
+   On effectue l'application numérique et on conclut :
+
+
+
+```{r}
+nx = 38
+ny = 37
+sx2 = 19877.37
+sy2 = 34459.62
+alpha = 0.05
+stat = sx2 / sy2
+quantile1 = qf(alpha/2, df1=nx-1, df2=ny-1)
+quantile2 = qf(1-alpha/2, df1=nx-1, df2=ny-1)
+pval = 2*pf(stat, df1=nx-1, df2=ny-1)   # car 'stat' < 1
+stat
+quantile1
+quantile2
+pval
+```
+
+On a $p_\mathrm{value} > \alpha$, donc on ne peut pas rejeter $H_0$ au risque $\alpha$. On peut donc conserver l'hypothèse que les  variances des deux échantillons sont identiques : $\sigma^2 = \sigma_X^2 = \sigma_Y^2$.
+
+
+Si nous disposions des mesures pour les deux échantillons respectivement dans les vecteurs `X` et `Y`, on peut utiliser :
+```{r,eval=FALSE}
+var.test(X,Y)
+```
+
+
+
+2. Le traitement par herbicides change-t-il significativement la densité des adventices ?
+
+L'estimateur groupé de la variance est :
+$$S^2 = \frac{(n_X-1) S_X^2 + (n_Y-1) S_Y^2}{n_X + n_Y - 2},$$
+et la loi associée est 
+$$\frac{(n_X + n_Y - 2)S^2}{\sigma^2} \sim \chi_{n_X + n_Y - 1}^2.$$
+
+On a donc :
+$$\bar X - \bar Y \sim \mathcal N \left( \mu_X - \mu_Y, \sigma^2 \left( \frac{1}{n_X} + \frac{1}{n_Y} \right) \right).$$
+
+On peut donc maintenant effectuer un test de comparaison de moyennes entre les deux populations :
+
+
+
+Les hypothèses de test sont :   
+ * $H_0 : \{ \mu_X = \mu_Y \}$,
+ * $H_1 : \{ \mu_X \ne \mu_Y \}$.
+ On se donne un risque de 1ère espèce $\alpha = 5\%$.   
+ La statistique de test sous $H_0$ est :   
+$$T = \frac{\bar X - \bar Y}{S\sqrt{\frac{1}{n_X}+\frac{1}{n_Y}}} \overset{H_0} \sim \mathcal T_{n_x + n_y - 2}.$$   
+ La zone de rejet est **bilatérale** et donnée par :   
+$$R = \big\{ T \ge | t_{n_X + n_Y-2; 1-\alpha/2} | \big\}.$$
+  La p-value est donnée par 
+\begin{align*}
+p_\mathrm{value} &= 2\,\mathrm{Pr} (T \ge |t|)\\
+&= 2\,(1 - \mathrm{Pr} (T \le |t|).
+\end{align*}
+ On effectue l'application numérique et on conclut :
+ 
+```{r}
+nx = 38
+ny = 37
+xbar = 116.02
+ybar = 193.59 
+sx2 = 19877.37
+sy2 = 34459.62
+spool2 = ( (nx-1)*sx2 + (ny-1)*sy2 ) / ( nx + ny - 2 )
+alpha = 0.05
+stat = (xbar - ybar) / sqrt( spool2 * (1/nx + 1/ny) )
+quantile = qt(1-alpha/2, df=nx+ny-2)
+pval = 2*(1-pt(abs(stat), df=nx+ny-2))
+stat
+quantile
+pval
+```
+
+On a $|t| > t_{n_X + n_Y - 2; 1 - \alpha/2}$, donc rejette $H_0$ au risque $\alpha$ : le traitement par herbicide change significativement la densité d'adventices.
+
+De même, si nous disposions des mesures pour les deux échantillons respectivement dans les vecteurs `X` et `Y`, on peut utiliser :
+```{r,eval=FALSE}
+t.test(X,Y,var.equal=TRUE)
+```
+
+
+3. Pour 8 parcelles supplémentaires il a été possible de diviser chaque parcelle en 2 et de ne traiter que la moitié de la parcelle avec des herbicides. En notant $X$ la densité d'adventices pour les $8$ demi-parcelles traitées avec des herbicides, $Y$ la densité d'adventices pour les $8$ demi-parcelles non traitées et $D=X-Y$ on a obtenu les résultats suivants :
+$$
+  \overline{x} = 116.02 \quad \overline{y} = 164.7 \quad s^2_{d} = 86535.61
+$$	
+	 Au vu de ces résultats est-il possible d'affirmer que le traitement par herbicides change significativement la densité des adventices ? 
+     
+Il s'agit d'échantillons appariés : pour tout $i$, les variables $X_i$ et $Y_i$ sont dépendantes puisque mesurées sur la même parcelle.
+Nous allons donc plutôt étudier leur différence que chacune individuellement.
+
+On a alors $n = n_X = n_Y$.
+On pose $D_i$ la différence de croissance entre les deux parties de la boite de Pétri $i$. On suppose que les $D_i$ sont **indépendantes** et **identiquement distribuées** et qu'elles suivent une loi normale :
+$$D_i \overset{i.i.d.} \sim \mathcal N(\mu_D, \sigma_D^2).$$
+
+Le test d'hypothèse revient alors à un test classique de comparaison de moyenne à une valeur de référence connue :
+
+
+Les hypothèses de test sont :
+ * $H_0 : \{ \mu_D = 0 \}$,
+ * $H_1 : \{ \mu_D \ne 0 \}$.   
+On se donne un risque de 1ère espèce $\alpha = 5\%$.
+La statistique de test sous $H_0$ est :
+$$T = \sqrt{n}\frac{\bar D}{S_D} \overset{H_0} \sim \mathcal T_{n - 1}.$$
+La zone de rejet est **bilatérale** et donnée par :
+$$R = \big\{ T \ge | t_{n-1; 1-\alpha/2} | \big\}.$$
+La p-value est donnée par 
+\begin{align*}
+p_\mathrm{value} &= 2\,\mathrm{Pr} (T \ge |t|)\\
+&= 2\,(1 - \mathrm{Pr} (T \le |t|).
+\end{align*}
+On effectue l'application numérique et on conclut :
+ 
+ 
+```{r}
+n = 8
+xbar = 116.02
+ybar = 164.7
+dbar = xbar - ybar
+sd2 = 86535.61
+alpha = 0.05
+stat = sqrt(n) * dbar / sqrt(sd2)
+quantile = qt(1-alpha/2, df=n-1)
+pval = 2*(1-pt(abs(stat), df=n-1))
+stat
+quantile
+pval
+```
+
+ On a $p_\mathrm{value} > \alpha$, donc on ne rejette pas $H_0$ au risque $\alpha$ : dans cette expérience on ne peut pas prouver que l'herbicide a un effet sur la densité d'adventices.
+ 
+# TD 8 : Tests du $\chi^2$ d'indépendance et tests d'ajustement à une loi
+
+## 8.1 Agriculture conventionnelle et bio
+
+Nous avons ces effectifs observés :
+
+```{r}
+N = matrix(c(195,99 ,6,212,33,5),nrow=2,ncol=3,byrow=TRUE)
+N
+```
+
+Les hypothèses de test sont : $H_0:$ indépendance entre les détections de pesticides et le type d'agriculture contre $H_1:$ dépendance entre les deux variables.
+
+La statistique de test est 
+$$D^2=\sum_{k=1}^2\sum_{\ell=1}^3\frac{(N_{k\ell} - \frac{N_{k+}\cdot N_{+\ell}}{n})^2}{\frac{N_{k+}\cdot N_{+\ell}}{n}}\overset{H_0,n\rightarrow+\infty}{\sim}\chi^2_{(2-1)(3-1)}$$
+On rejette si $D^2$ dépasse le quantile au niveau $1-\alpha$ d'une loi $\chi^2_2$.
+
+```{r}
+# on calcule la somme des effectifs n et les sommes par lignes (nk) et par colonne (nl) 
+n=sum(N)
+nk = rowSums(N)
+nl = colSums(N)
+nk
+nl
+n
+# Détermination des effectifs théoriques
+nkl = (nk)%*%t(nl)/n
+nkl
+```
+
+
+```{r}
+## statistique de test D2
+
+D2=sum((N-nkl)** 2/ nkl)
+alpha=0.05
+
+## degré de liberté
+
+ddl=2
+
+## quantile 
+quantile = qchisq(1-alpha, df=ddl)
+pval = 1-pchisq(D2, df=ddl)
+
+D2
+quantile
+pval
+```
+On a $p_\mathrm{value} < \alpha$, donc on  rejette  $H_0$ au risque $\alpha$ : le type d'agriculture et la quantité de résidus relevée ne sont pas indépendants.
+
+
+## 8.2 Moustiques
+
+Dans une étude sur un répulsif de moustiques, on a compté le nombre de piqures de chaque personne à partir d'un échantillon de 150 personnes. On a obtenu les données du tableau suivant :
+
+ | Nombre de piqures        |  0  |  1  |  2  |  3 |  4  |   5 |  6  | $>6$ |
+ |:------------------------:|:---:|:---:|:---:|:--:|:---:|:---:|:---:|:----:| 
+ | Effectif observé $n_i$   |  32 |  54 |  34 |  21|   6 | 2   |  1  |   0  |
+ 
+    
+Peut-on accepter l'hypothèse que le nombre de piqures pour une personne est une variable aléatoire distribuée selon une loi de Poisson ?
+
+  On suppose que $X$ est la v.a qui représente le nombre de piqures pour une personne.
+
+#####  \" X  suit-elle une loi de Poisson ? \"
+   
+  - Les hypothèses du test sont :
+      * $H_0 : \{ X \,\text{suit une loi de poisson} \}$,
+      * $H_1 : \{ X \,\text{suit une autre loi} \}$.
+  - Déterminer les probabilités ($\pi_i$) et effectifs ($t_i$) théoriques sous $H_0$
+     
+     $$\forall i;\,\,\pi_{i}=\mathrm{Pr}(X=k_i)=\frac{\lambda^k}{k!}e^{-\lambda}$$
+    
+    où $\widehat{\lambda}$ est estimé comme la moyenne empirique de  $X$ et 
+    $k=\{0,1,2,3,4,5,6 \}$.
+    
+    $$\forall i; \,\, t_i=\pi_i\times n.$$
+
+  - On se donne un risque de 1ère espèce $\alpha =5\%.$
+
+  - La statistique de test sous $H_0$ est :
+  $$D= \sum_{i=1}^{p}\frac{(n_{i}-t_{i})^2}{t_{i}} \overset{H_0}\sim \chi^2_{p-r-1}.$$
+  où $p$ est le nombre de colonne et $r$ le nombre de paramètre à estimer.
+
+  - La zone de rejet est donnée par :
+ $$R =\big\{ D\ge  \chi^2_{{p-r-1}; 1-\alpha}\big\}.$$
+  - (Optionnel) La p-value est donnée par 
+  \begin{align*}
+ p_\mathrm{value} &= \,\mathrm{Pr} (D \ge t)\\
+    &=\,  1 - \mathrm{Pr} (D \le t).
+   \end{align*}
+  - On effectue l'application numérique et on conclut.
+
+
+```{r}
+k=c(0,1,2,3,4,5,6)
+
+ni=c(32,54,34,21,6,2,1)
+
+n=sum(ni)
+
+## détermine la moyenne empirique qui représente le paramètre lambda de la loi de Poisson 
+
+lamda=sum(ni/n*k)
+
+## détermine les probabilités théoriques pi de chaque colonne
+
+pi=dpois(k,lamda)
+
+## Détermine les effectifs théoriques ti
+ti=pi*n
+
+## Statistique de test D2
+D2=sum((ni-ti)** 2/ ti)
+
+
+alpha=0.05
+
+## degré de liberté 
+
+ddl=length(k)-2
+
+## quantile 
+
+quantile = qchisq(1-alpha, df=ddl)
+
+pval = 1-pchisq(D2, df=ddl)
+
+D2
+quantile
+pval
+```
+

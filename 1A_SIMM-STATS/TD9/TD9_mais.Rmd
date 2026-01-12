@@ -1,0 +1,123 @@
+---
+title: "TD9 : Statistiques descriptives, intervalles de confiance et tests en Python"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+## Importation des librairies nécessaires
+
+```{r}
+library(ggplot2)
+library(GGally)
+```
+
+
+## Importation des données
+
+On s'intéresse au rendement de différentes variétés de maïs et à ses caractéristiques. On dispose des variables suivantes pour 288 parcelles :
+
+  - un marqueur génétique pouvant prendre deux valeurs distinctes,
+  - la variété de maïs de la parcelle,
+  - le rendement de la parcelle,
+  - les teneurs moyennes d'huile, de protéine et d’amidon dans un grain de maïs sur la parcelle,
+  - le nombre moyen de degrés jours avant la floraison des plants de maïs sur la parcelle, et
+  - le nombre moyen de feuilles par plant de maïs sur la parcelle.
+  
+  
+Pour ce faire nous chargeons les données du fichier texte `donnees_mais.txt`.
+Ce fichier doit être situé dans le même répertoire que celui où vous enregistrez ce document Rmd.
+
+```{r}
+data = read.table("donnees_mais.txt",header=TRUE)
+# extrait des données
+head(data)
+```
+
+## Étude descriptive graphique
+
+1. Graphique illustrant le rendement en fonction de la variété.
+
+```{r}
+ggplot(data,aes(x=Variete,y=Rendement)) + geom_boxplot()
+```
+
+
+2. Graphique illustrant le rendement en fonction de la variété et du marqueur.
+
+```{r}
+ggplot(data,aes(x=Variete,y=Rendement,fill=Marqueur)) + geom_boxplot()
+```
+
+
+3. Graphiques lillustrant le rendement en fonction des teneurs en huile, protéine et amidon, de la floraison et des feuilles.
+
+```{r}
+ggplot(data,aes(x=Huile,y=Rendement,color=Variete)) + geom_point()
+ggplot(data,aes(x=Proteine,y=Rendement,color=Variete)) + geom_point()
+ggplot(data,aes(x=Amidon,y=Rendement,color=Variete)) + geom_point()
+ggplot(data,aes(x=Floraison,y=Rendement,color=Variete)) + geom_point()
+ggplot(data,aes(x=Feuilles,y=Rendement,color=Variete)) + geom_point()
+```
+
+Regrouper ces différents nuages de points sur un unique graphique avec affichage des densités estimées ainsi que des calculs des coefficients de corrélation.
+
+```{r}
+ggpairs(data[,c("Huile","Proteine","Amidon","Floraison","Feuilles")])
+```
+
+Quelles variables ont une influence sur le rendement ?
+
+
+## Exercice 1 : Étude du rendement pour la variété `Corn_Belt_Dent`
+
+
+On suppose que le rendement pour la variété `Corn_Belt_Dent` suit une loi normale de moyenne $\mu$ et de variance $\sigma^2$.
+
+On peut extraire ainsi les rendements obtenus avec la variété `Corn_Belt_Dent` :
+```{r}
+rendCBD = data$Rendement[data$Variete=="Corn_Belt_Dent"]
+```
+
+
+1. Calculer la moyenne totale des rendements et la moyenne des rendements pour la variété `Corn_Belt_Dent`.
+
+2. Construire un intervalle de confiance de niveau de confiance 95$\%$ pour la moyenne $\mu$ des rendements pour la variété `Corn_Belt_Dent`.
+
+3. Construire un intervalle de confiance de niveau de confiance 95$\%$ pour la variance $\sigma^2$ des rendements pour la variété `Corn_Belt_Dent`.
+
+4. Construire un test pour répondre à la question : " le rendement pour la variété `Corn_Belt_Dent` est-il supérieur à 336? " au risque 5$\%$.
+
+
+## Exercice 2 : Étude des marqueurs
+
+On s'intéresse à la présence du marqueur 1 sur les maïs génotypés.
+
+1. Calculer la proportion du marqueur 1 parmi tous les maïs.
+
+```{r}
+mean(data$Marqueur==1)
+```
+
+
+2. Construire un intervalle de confiance de niveau de confiance 95$\%$ pour la proportion du marqueur 1 parmi tous les maïs.
+
+3. Construire un test pour répondre à la question : " la proportion du marqueur 1 parmi tous les maïs est-elle égale à 1/2 " au risque 5%.
+
+
+## Exercice 3 : Comparaison des rendements pour les variétés `Corn_Belt_Dent` et `European_Flint`
+
+
+Construire un test au risque 5$\%$ de l'égalité des rendements pour les variétés `Corn_Belt_Dent` et `European_Flint`.
+
+On peut extraire ainsi les rendements :
+
+```{r}
+rendCBD = data$Rendement[data$Variete=="Corn_Belt_Dent"]
+rendEF = data$Rendement[data$Variete=="European_Flin"]
+```
+
